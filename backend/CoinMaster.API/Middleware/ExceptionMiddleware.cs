@@ -43,10 +43,13 @@ public class ExceptionMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception");
+            _logger.LogError(ex, "Unhandled exception on {Path}", context.Request.Path);
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = "An internal error occurred." }));
+            var errorMsg = context.RequestServices.GetService<IWebHostEnvironment>()?.IsProduction() == true
+                ? $"Internal error: {ex.GetType().Name}: {ex.Message}"
+                : $"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = errorMsg }));
         }
     }
 }
