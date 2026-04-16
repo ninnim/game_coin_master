@@ -31,3 +31,9 @@ final spinProvider =
     );
 
 final betMultiplierProvider = StateProvider<int>((ref) => 1);
+
+/// Coin Master-style bet tiers up to x100K
+const betTiers = [
+  1, 2, 3, 5, 10, 25, 50, 100, 200, 500,
+  1000, 2000, 5000, 10000, 25000, 50000, 100000,
+];

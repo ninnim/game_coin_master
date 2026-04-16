@@ -18,17 +18,18 @@ public class SpinService
     // Pending special actions per user (attack/raid/shield/energy)
     private static readonly ConcurrentDictionary<Guid, string> _pendingActions = new();
 
-    // Symbol weights: coin_small=35, coin_medium=20, coin_large=10, attack=12, raid=8, shield=8, energy=5, jackpot=2
+    // Symbol weights — balanced like real Coin Master.
+    // 3-of-a-kind odds:  attack ≈1 in 64,  raid ≈1 in 125,  shield ≈1 in 296
     private static readonly (string Symbol, int Weight)[] _symbolWeights =
     {
-        ("coin_small",  35),
-        ("coin_medium", 20),
-        ("coin_large",  10),
-        ("attack",      12),
-        ("raid",         8),
-        ("shield",       8),
-        ("energy",       5),
-        ("jackpot",      2)
+        ("coin_small",  12),
+        ("coin_medium",  8),
+        ("coin_large",   5),
+        ("attack",      25),
+        ("raid",        20),
+        ("shield",      15),
+        ("energy",      10),
+        ("jackpot",      5)
     };
 
     private static readonly int _totalWeight = _symbolWeights.Sum(s => s.Weight);
@@ -69,10 +70,11 @@ public class SpinService
             if (user.IsBanned)
                 throw new InvalidOperationException("Account is banned.");
 
-            // Validate bet multiplier
-            int[] allowedBets = { 1, 2, 3, 5, 10 };
+            // Validate bet multiplier (Coin Master tiers up to x100K)
+            int[] allowedBets = { 1, 2, 3, 5, 10, 25, 50, 100, 200, 500,
+                                  1000, 2000, 5000, 10000, 25000, 50000, 100000 };
             if (!allowedBets.Contains(betMultiplier))
-                betMultiplier = user.BetMultiplier;
+                betMultiplier = 1;
 
             // Refill spins if timer has elapsed
             if (DateTime.UtcNow >= user.SpinRefillAt && user.Spins < _settings.MaxSpins)
