@@ -12,16 +12,17 @@ class SpinEmpireApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Spin Empire',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
+      theme: ThemeData(
+        brightness: Brightness.light,
         scaffoldBackgroundColor: AppColors.background,
-        colorScheme: const ColorScheme.dark(
-          primary: AppColors.gold,
-          secondary: AppColors.purple,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.purple,
+          brightness: Brightness.light,
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.surface,
+          backgroundColor: AppColors.purple,
+          foregroundColor: AppColors.textWhite,
           elevation: 0,
-          iconTheme: IconThemeData(color: AppColors.textPrimary),
         ),
         tabBarTheme: const TabBarThemeData(
           labelColor: AppColors.gold,
