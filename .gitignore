@@ -1,0 +1,40 @@
+# Backend
+backend/CoinMaster.API/bin/
+backend/CoinMaster.API/obj/
+backend/CoinMaster.API/uploads/
+*.user
+*.suo
+.vs/
+
+# Frontend Flutter
+frontend/coin_master_flutter/.dart_tool/
+frontend/coin_master_flutter/.flutter-plugins
+frontend/coin_master_flutter/.flutter-plugins-dependencies
+frontend/coin_master_flutter/.packages
+frontend/coin_master_flutter/build/
+frontend/coin_master_flutter/.metadata
+frontend/coin_master_flutter/pubspec.lock
+frontend/coin_master_flutter/android/.gradle/
+frontend/coin_master_flutter/android/app/build/
+frontend/coin_master_flutter/android/build/
+frontend/coin_master_flutter/ios/Pods/
+frontend/coin_master_flutter/ios/.symlinks/
+frontend/coin_master_flutter/linux/flutter/
+frontend/coin_master_flutter/macos/Flutter/
+frontend/coin_master_flutter/windows/flutter/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+*.env.local

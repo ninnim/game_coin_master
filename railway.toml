@@ -1,0 +1,8 @@
+[build]
+dockerfilePath = "backend/CoinMaster.API/Dockerfile"
+
+[deploy]
+startCommand = "dotnet CoinMaster.API.dll"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"

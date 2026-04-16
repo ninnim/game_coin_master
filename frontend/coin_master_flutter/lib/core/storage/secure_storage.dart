@@ -1,0 +1,21 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+class SecureStorage {
+  static const _storage = FlutterSecureStorage();
+  static const _tokenKey = 'jwt_token';
+  static const _userIdKey = 'user_id';
+
+  static Future<void> saveToken(String token) =>
+      _storage.write(key: _tokenKey, value: token);
+
+  static Future<String?> getToken() => _storage.read(key: _tokenKey);
+
+  static Future<void> deleteToken() => _storage.delete(key: _tokenKey);
+
+  static Future<void> saveUserId(String userId) =>
+      _storage.write(key: _userIdKey, value: userId);
+
+  static Future<String?> getUserId() => _storage.read(key: _userIdKey);
+
+  static Future<void> clearAll() => _storage.deleteAll();
+}
