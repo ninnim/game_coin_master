@@ -11,5 +11,6 @@ public class Card
     [Column("rarity")] public string Rarity { get; set; } = null!;
     [Column("image_url")] public string? ImageUrl { get; set; }
     [Column("card_order")] public int CardOrder { get; set; } = 0;
+    [ForeignKey("SetId")]
     public CardSet CardSet { get; set; } = null!;
 }
