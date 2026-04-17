@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import '../providers/spin_provider.dart';
 import '../../../core/models/spin_result_model.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../core/services/audio_manager.dart';
+import '../widgets/three_d_slot_machine.dart';
 
 class MainGameScreen extends ConsumerStatefulWidget {
   const MainGameScreen({super.key});
@@ -39,6 +41,12 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
   // ── Spin button ──
   late AnimationController _spinBtnCtrl;
   late Animation<double> _spinBtnScale;
+
+  // ── 3D slot machine (Three.js WebView) ──
+  final GlobalKey<ThreeDSlotMachineState> _threeDKey =
+      GlobalKey<ThreeDSlotMachineState>();
+  final Set<int> _reelsStoppedSet = {};
+  Completer<void>? _lastReelStoppedCompleter;
 
   // ── Constants ──
   static const double _reelVisibleHeight = 192.0;
@@ -159,6 +167,17 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
     _reelDecelEnd[i] = pos + extra;
   }
 
+  // Callback from 3D scene when a reel finishes its deceleration
+  void _onThreeDReelStopped(int reelIndex) {
+    AudioManager.instance.playReelStop();
+    _reelsStoppedSet.add(reelIndex);
+    if (_reelsStoppedSet.length >= 3 &&
+        _lastReelStoppedCompleter != null &&
+        !_lastReelStoppedCompleter!.isCompleted) {
+      _lastReelStoppedCompleter!.complete();
+    }
+  }
+
   int _symbolIndexForSlot(String slot) {
     switch (slot) {
       case 'coin_small':
@@ -211,6 +230,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
 
     _reelMasterCtrl.reset();
     _reelMasterCtrl.forward();
+    _reelsStoppedSet.clear();
+    _lastReelStoppedCompleter = Completer<void>();
+    _threeDKey.currentState?.startSpin(); // drive 3D reels
     AudioManager.instance.playSpinStart();
 
     // API call runs while reels spin
@@ -223,11 +245,17 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
     }
 
     // Set target symbols — animation deceleration will land on these
-    _reelFinalIndex[0] = _symbolIndexForSlot(result.slot1);
-    _reelFinalIndex[1] = _symbolIndexForSlot(result.slot2);
-    _reelFinalIndex[2] = _symbolIndexForSlot(result.slot3);
+    final s1 = _symbolIndexForSlot(result.slot1);
+    final s2 = _symbolIndexForSlot(result.slot2);
+    final s3 = _symbolIndexForSlot(result.slot3);
+    _reelFinalIndex[0] = s1;
+    _reelFinalIndex[1] = s2;
+    _reelFinalIndex[2] = s3;
 
-    // If API was slow and animation progressed too far, restart
+    // Drive 3D reels to land on the same symbols
+    _threeDKey.currentState?.stopReels(s1, s2, s3);
+
+    // If Flutter animation was slow and progressed too far, restart
     if (_reelMasterCtrl.value > 0.32) {
       final savedPos = List<double>.from(_reelScrollPos);
       _reelMasterCtrl.reset();
@@ -238,10 +266,14 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
     }
     _reelTargetsSet = true;
 
-    // Wait for the animation to complete
+    // Wait for all 3 reels to stop — either via 3D callback or animation completion
     final remainingT = 1.0 - _reelMasterCtrl.value;
-    final waitMs = (3800 * remainingT).toInt() + 250;
-    await Future.delayed(Duration(milliseconds: waitMs));
+    final flutterWaitMs = (3800 * remainingT).toInt() + 250;
+    final waitFuture = _lastReelStoppedCompleter?.future ?? Future<void>.value();
+    await Future.any([
+      waitFuture,
+      Future<void>.delayed(Duration(milliseconds: flutterWaitMs)),
+    ]);
 
     if (!mounted) return;
 
@@ -741,7 +773,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
         children: [
           Column(
             children: [
-              _buildSlotFrame(),
+              _build3DSlotMachine(),
               const SizedBox(height: 10),
               _buildBetSelector(bet),
               const SizedBox(height: 10),
@@ -767,6 +799,45 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
   }
 
   // ── Gold frame + dark interior ──
+  // ── 3D slot machine (Three.js WebView) wrapped in a gold outer frame ──
+  Widget _build3DSlotMachine() {
+    return Container(
+      height: 280,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFE082),
+            Color(0xFFFFC107),
+            Color(0xFFFF8F00),
+            Color(0xFFFFC107),
+            Color(0xFFFFE082),
+          ],
+          stops: [0.0, 0.2, 0.5, 0.8, 1.0],
+        ),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x66000000), blurRadius: 14, offset: Offset(0, 6)),
+          BoxShadow(
+              color: Color(0x44FFD700), blurRadius: 24, spreadRadius: 2),
+        ],
+      ),
+      padding: const EdgeInsets.all(4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: ThreeDSlotMachine(
+          key: _threeDKey,
+          onReelStopped: _onThreeDReelStopped,
+        ),
+      ),
+    );
+  }
+
+  // ── (Legacy) Flutter slot frame — kept for fallback reference ──
+  // ignore: unused_element
   Widget _buildSlotFrame() {
     return Transform(
       alignment: Alignment.center,

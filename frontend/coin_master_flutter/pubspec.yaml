@@ -37,6 +37,9 @@ dependencies:
   # Audio
   audioplayers: ^5.2.0
 
+  # 3D rendering (Three.js via WebView for realistic Coin Master-style 3D)
+  webview_flutter: ^4.7.0
+
   # Utils
   intl: ^0.19.0
   vibration: ^3.1.8
@@ -53,3 +56,4 @@ flutter:
     - assets/images/slots/
     - assets/images/ui/
     - assets/audio/
+    - assets/3d/
