@@ -10,6 +10,7 @@ import '../../../core/models/spin_result_model.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../core/services/audio_manager.dart';
 import '../widgets/three_d_slot_machine.dart';
+import '../widgets/coin_master_widgets.dart';
 
 class MainGameScreen extends ConsumerStatefulWidget {
   const MainGameScreen({super.key});
@@ -348,8 +349,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
     final gs = ref.watch(gameStateProvider);
     final ps = ref.watch(playerStateProvider);
     final bet = ref.watch(betMultiplierProvider);
-    final villageName = ps.valueOrNull?.currentVillage.name ?? 'Village';
-    final villageNum = ps.valueOrNull?.currentVillage.orderNum ?? 1;
+    final playerName = ps.valueOrNull?.user.displayName ?? 'Player';
+    final gems = ps.valueOrNull?.user.gems ?? 0;
+    final stars = ps.valueOrNull?.user.totalStars ?? 0;
 
     return Scaffold(
       body: Container(
@@ -358,170 +360,179 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF64B5F6), // bright sky
-              Color(0xFF1976D2), // medium blue
-              Color(0xFF0D47A1), // deep blue
-              Color(0xFF1A0A3E), // dark purple
-              Color(0xFF0D0620), // near black
+              Color(0xFF81D4FA), // sky blue
+              Color(0xFF4FC3F7),
+              Color(0xFFB3E5FC),
+              Color(0xFFFFF8E1), // cloudy cream at bottom
             ],
-            stops: [0.0, 0.18, 0.35, 0.55, 0.75],
+            stops: [0.0, 0.3, 0.7, 1.0],
           ),
         ),
         child: SafeArea(
           bottom: false,
           child: Column(
             children: [
-              _buildTopHUD(gs.coins, gs.spins, gs.shields),
+              _buildTopHUD(gs.coins, gems, stars, gs.shields),
               Expanded(
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      _buildVillageScene(villageName, villageNum),
-                      const SizedBox(height: 6),
-                      _buildSlotArea(bet, gs.spins),
-                      if (_pendingAction != null) _buildPendingAction(),
-                      const SizedBox(height: 70),
-                    ],
-                  ),
+                child: Stack(
+                  children: [
+                    // Background clouds
+                    _buildClouds(),
+
+                    // Center column: logo + progress + 3D slot + boost + bet
+                    Positioned.fill(
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 68),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 4),
+                            CMLogoCard(
+                              playerName: playerName,
+                              coinAmount: _formatNumber(gs.coins),
+                              winMultiplier: bet > 1 ? 'x$bet' : null,
+                              onTap: () => context.push('/profile'),
+                            ),
+                            const SizedBox(height: 6),
+                            _buildProgressBars(bet),
+                            const SizedBox(height: 4),
+                            _build3DSlotMachine(),
+                            const SizedBox(height: 4),
+                            CMPowerBoostBanner(multiplier: bet),
+                            const SizedBox(height: 4),
+                            _buildBetSelector(bet),
+                            const SizedBox(height: 4),
+                            _buildSpinCountPill(gs.spins),
+                            if (_pendingAction != null) _buildPendingAction(),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Left rail (vertically arranged timed buttons)
+                    Positioned(
+                      left: 4,
+                      top: 4,
+                      bottom: 12,
+                      child: SingleChildScrollView(
+                        child: _buildLeftRail(),
+                      ),
+                    ),
+
+                    // Right rail
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      bottom: 12,
+                      child: SingleChildScrollView(
+                        child: _buildRightRail(),
+                      ),
+                    ),
+
+                    // Win effect overlay (full-area)
+                    if (_winType.isNotEmpty)
+                      Positioned.fill(child: _buildWinEffectOverlay()),
+                  ],
                 ),
               ),
+              // Bottom row: corner badge + pet + SPIN + bonus + corner badge
+              _buildBottomRow(gs.spins, bet),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
   // ══════════════════════ TOP HUD ══════════════════════
 
-  Widget _buildTopHUD(int coins, int spins, int shields) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+  Widget _buildTopHUD(int coins, int gems, int stars, int shields) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: Row(
         children: [
-          // Level badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7B2FBE), Color(0xFF4A148C)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.gold, width: 1.5),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('⭐', style: TextStyle(fontSize: 14)),
-                SizedBox(width: 2),
-                Text('1',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Coin display
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6A1B9A), Color(0xFF4A148C)],
+          CMCounterPill(
+            leadingIcon: Container(
+              width: 22,
+              height: 22,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFFFF176), Color(0xFFF9A825)],
                 ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.gold, width: 1.5),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFFFD54F), Color(0xFFF9A825)],
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x66000000),
-                          blurRadius: 2,
-                          offset: Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text('\$',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF5D4037))),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      _formatCoins(coins),
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        shadows: [
-                          Shadow(
-                              color: Colors.black38,
-                              offset: Offset(1, 1),
-                              blurRadius: 2),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF00C853),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Text('+',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14)),
-                    ),
-                  ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: Color(0x66000000), blurRadius: 2),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Spins badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6A1B9A), Color(0xFF4A148C)],
+              child: const Center(
+                child: Text('\$',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF5D4037))),
               ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.gold, width: 1.5),
+            ),
+            value: _formatCoins(coins),
+            background: const Color(0xFF6A1B9A),
+            borderColor: const Color(0xFFFFD700),
+            maxWidth: 140,
+            onPlus: () => context.push('/chests'),
+          ),
+          const SizedBox(width: 4),
+          CMCounterPill(
+            leadingIcon: const Text('💎', style: TextStyle(fontSize: 16)),
+            value: _formatCompact(gems),
+            background: const Color(0xFFC2185B),
+            borderColor: const Color(0xFFFFD700),
+            maxWidth: 80,
+            onPlus: () => context.push('/chests'),
+          ),
+          const Spacer(),
+          // Star / total stars badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(60),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('⚡', style: TextStyle(fontSize: 12)),
+                const Text('⭐', style: TextStyle(fontSize: 14)),
                 const SizedBox(width: 3),
                 Text(
-                  _formatCompact(spins),
+                  _formatCompact(stars),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    shadows: [
+                      Shadow(color: Colors.black45, blurRadius: 2),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Shields X/5
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(60),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('🛡️', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 3),
+                Text(
+                  '$shields/3',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
                     fontSize: 12,
                   ),
                 ),
@@ -529,57 +540,23 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
             ),
           ),
           const SizedBox(width: 4),
-          // Shields
-          ...List.generate(
-            3,
-            (i) => Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: i < shields
-                      ? const Color(0xFF00BCD4)
-                      : const Color(0xFF424242),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: i < shields ? Colors.white : Colors.white30,
-                    width: 1.5,
-                  ),
-                  boxShadow: i < shields
-                      ? const [
-                          BoxShadow(
-                              color: Color(0x6600E5FF),
-                              blurRadius: 6,
-                              spreadRadius: 1)
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text('🛡️',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: i < shields
-                              ? null
-                              : Colors.white.withAlpha(80))),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Settings
+          // Menu button
           GestureDetector(
             onTap: () => context.push('/profile'),
             child: Container(
-              width: 30,
-              height: 30,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
-                color: const Color(0xFF4A148C),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.gold, width: 1),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF5252), Color(0xFFD50000)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFD700), width: 2),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x66000000), blurRadius: 3, offset: Offset(0, 2)),
+                ],
               ),
-              child:
-                  const Icon(Icons.settings, color: Colors.white, size: 16),
+              child: const Icon(Icons.menu, color: Colors.white, size: 18),
             ),
           ),
         ],
@@ -587,8 +564,290 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
     );
   }
 
-  // ══════════════════════ VILLAGE SCENE ══════════════════════
+  // ══════════════════════ CLOUDS BACKGROUND ══════════════════════
 
+  Widget _buildClouds() {
+    return const IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned(top: 30, left: 80, child: Text('☁️', style: TextStyle(fontSize: 28))),
+          Positioned(top: 260, left: 40, child: Text('☁️', style: TextStyle(fontSize: 20))),
+          Positioned(bottom: 40, left: 60, child: Text('☁️', style: TextStyle(fontSize: 30))),
+          Positioned(bottom: 80, right: 50, child: Text('☁️', style: TextStyle(fontSize: 24))),
+          Positioned(top: 100, right: 60, child: Text('☁️', style: TextStyle(fontSize: 18))),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════ PROGRESS BARS ══════════════════════
+
+  Widget _buildProgressBars(int bet) {
+    // Chest progress (deterministic demo values from current bet)
+    final chestCurrent = (bet * 3).clamp(0, 40);
+    // XP bar — scaled by current coins count to feel dynamic
+    final xpTarget = 10000;
+    final xpCurrent = ((ref.read(gameStateProvider).coins % xpTarget)).toInt();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CMProgressBar(
+          leftIcon: '🎁',
+          current: chestCurrent,
+          max: 40,
+          fillGradient: const [Color(0xFF4FC3F7), Color(0xFF0288D1)],
+          background: const Color(0xFF4A148C),
+          centerLabel: '$chestCurrent / 40',
+        ),
+        const SizedBox(height: 4),
+        CMProgressBar(
+          leftIcon: '🔥',
+          current: xpCurrent,
+          max: xpTarget,
+          rightLabel: '20K',
+          fillGradient: const [Color(0xFFFF8A65), Color(0xFFFF5252)],
+          background: const Color(0xFF4A148C),
+        ),
+      ],
+    );
+  }
+
+  // ══════════════════════ SPIN COUNT PILL ══════════════════════
+
+  Widget _buildSpinCountPill(int spins) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF26A69A), Color(0xFF00796B)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD54F), width: 2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x66000000), blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$spins/${spins > 180 ? spins : 180}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              shadows: [
+                Shadow(color: Colors.black45, offset: Offset(1, 1), blurRadius: 2),
+              ],
+            ),
+          ),
+          Text(
+            '+${_formatNumber(spins)} spins',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════ LEFT RAIL ══════════════════════
+
+  Widget _buildLeftRail() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CMRailIcon(emoji: '🎁', accent: const Color(0xFFFFB300),
+            onTap: () => context.push('/chests')),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '👑', timer: '00:54:06', accent: const Color(0xFFFFD700)),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '✌️', timer: '00:54:06', accent: const Color(0xFFE91E63)),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '🎯', timer: '21:54:06', accent: const Color(0xFFFF6D00),
+            onTap: () => context.push('/events')),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '🐷', timer: '21:54:06', accent: const Color(0xFFE91E63)),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '⬆️', badge: '2', accent: const Color(0xFFFFD700)),
+      ],
+    );
+  }
+
+  // ══════════════════════ RIGHT RAIL ══════════════════════
+
+  Widget _buildRightRail() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CMRailIcon(emoji: '🧪', accent: const Color(0xFF7B2FBE),
+            onTap: () => context.push('/pets')),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '🗿', timer: '17:54:07', accent: const Color(0xFFFF8F00)),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '🧱', timer: '21:50:05', accent: const Color(0xFF8D6E63),
+            onTap: () => context.push('/village')),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '🌿', badge: '5', timer: '45:54:05',
+            accent: const Color(0xFF66BB6A)),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '🏰', accent: const Color(0xFF7B2FBE),
+            onTap: () => context.push('/village-map')),
+        const SizedBox(height: 8),
+        CMRailIcon(emoji: '👥', badge: '1', accent: const Color(0xFFFFD700),
+            onTap: () => context.push('/friends')),
+      ],
+    );
+  }
+
+  // ══════════════════════ BOTTOM ROW ══════════════════════
+
+  Widget _buildBottomRow(int spins, int bet) {
+    final canSpin = !_isSpinning && spins >= bet;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Corner: potion/inventory
+          CMCornerBadge(
+            emoji: '🧪',
+            badge: 2,
+            onTap: () => context.push('/pets'),
+          ),
+          const SizedBox(width: 4),
+          // Pet character
+          CMPetCharacter(
+            emoji: '🦊',
+            levelBadge: 'LV 1',
+            onTap: () => context.push('/pets'),
+          ),
+          // SPIN button centered
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _buildSpinButtonCM(spins, bet, canSpin),
+            ),
+          ),
+          // Bonus wheel
+          const CMBonusWheel(),
+          const SizedBox(width: 4),
+          // Corner: clan/shield
+          CMCornerBadge(
+            emoji: '🛡️',
+            badge: 7,
+            accent: const Color(0xFF00E5FF),
+            onTap: () => context.push('/clans'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════ COIN MASTER-STYLE SPIN BUTTON ══════════════════════
+
+  Widget _buildSpinButtonCM(int spins, int bet, bool canSpin) {
+    return GestureDetector(
+      onTapDown: canSpin
+          ? (_) {
+              _spinBtnCtrl.forward();
+              AudioManager.instance.playButtonTap();
+            }
+          : null,
+      onTapUp: canSpin
+          ? (_) {
+              _spinBtnCtrl.reverse();
+              _doSpin();
+            }
+          : null,
+      onTapCancel: () => _spinBtnCtrl.reverse(),
+      child: ScaleTransition(
+        scale: _spinBtnScale,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: canSpin
+                      ? const [
+                          Color(0xFFFF7043),
+                          Color(0xFFE53935),
+                          Color(0xFFB71C1C),
+                        ]
+                      : [Colors.grey.shade500, Colors.grey.shade700],
+                ),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: canSpin ? const Color(0xFFFFD54F) : Colors.grey.shade600,
+                  width: 3,
+                ),
+                boxShadow: canSpin
+                    ? const [
+                        BoxShadow(
+                            color: Color(0x88B71C1C),
+                            blurRadius: 14,
+                            offset: Offset(0, 5)),
+                        BoxShadow(
+                            color: Color(0x44FFD700),
+                            blurRadius: 10,
+                            spreadRadius: 1),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: _isSpinning
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 3),
+                      )
+                    : Text(
+                        canSpin ? 'SPIN' : 'NO SPINS',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 26,
+                          letterSpacing: 4,
+                          shadows: [
+                            Shadow(
+                                color: Color(0xAA5D0000),
+                                offset: Offset(2, 2),
+                                blurRadius: 4),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Hold for AutoSpin',
+              style: TextStyle(
+                color: Color(0xFF5D4037),
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══ (LEGACY _buildTopHUD removed — replaced by Coin Master-style HUD above) ═══
+
+
+  // ══════════════════════ VILLAGE SCENE (legacy) ══════════════════════
+
+  // ignore: unused_element
   Widget _buildVillageScene(String villageName, int villageNum) {
     return GestureDetector(
       onTap: () => context.push('/village'),
@@ -763,8 +1022,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
     ); // end GestureDetector
   }
 
-  // ══════════════════════ SLOT AREA (frame + reels + controls) ══════════════════════
+  // ══════════════════════ SLOT AREA (legacy — replaced by Coin Master layout) ══════════════════════
 
+  // ignore: unused_element
   Widget _buildSlotArea(int bet, int spins) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1570,8 +1830,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
     );
   }
 
-  // ══════════════════════ BOTTOM NAV ══════════════════════
+  // ══════════════════════ BOTTOM NAV (legacy — kept for reference) ══════════════════════
 
+  // ignore: unused_element
   Widget _buildBottomNav() {
     return Container(
       decoration: const BoxDecoration(
