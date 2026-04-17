@@ -560,7 +560,12 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
   Widget _buildVillageScene(String villageName, int villageNum) {
     return GestureDetector(
       onTap: () => context.push('/village'),
-      child: Container(
+      child: Transform(
+        alignment: Alignment.bottomCenter,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.0012) // 3D perspective
+          ..rotateX(0.08), // slight tilt forward
+        child: Container(
       height: 175,
       margin: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
@@ -721,8 +726,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
           ),
         ],
       ),
-    ),
-    );
+    ), // end Container
+    ), // end Transform
+    ); // end GestureDetector
   }
 
   // ══════════════════════ SLOT AREA (frame + reels + controls) ══════════════════════
@@ -762,7 +768,12 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
 
   // ── Gold frame + dark interior ──
   Widget _buildSlotFrame() {
-    return Container(
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.0008) // 3D perspective depth
+        ..rotateX(-0.02), // very slight tilt back for depth
+      child: Container(
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -783,6 +794,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
               color: Color(0x66000000), blurRadius: 14, offset: Offset(0, 6)),
           BoxShadow(
               color: Color(0x44FFD700), blurRadius: 24, spreadRadius: 2),
+          // 3D depth shadow
+          BoxShadow(
+              color: Color(0x55000000), blurRadius: 30, offset: Offset(0, 16), spreadRadius: -4),
         ],
       ),
       child: Container(
@@ -830,6 +844,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
           ],
         ),
       ),
+    ), // end Transform
     );
   }
 
@@ -1450,9 +1465,11 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen>
             onTap: () {
               final action = _pendingAction;
               setState(() => _pendingAction = null);
-              // Navigate to target selection (attack or raid)
-              if (action == 'attack' || action == 'raid') {
-                context.push('/friends');
+              // Auto-navigate to attack/raid screen with random public target
+              if (action == 'attack') {
+                context.push('/attack');
+              } else if (action == 'raid') {
+                context.push('/raid');
               }
             },
             child: Container(

@@ -15,6 +15,8 @@ import 'features/clans/screens/clans_screen.dart';
 import 'features/events/screens/events_screen.dart';
 import 'features/achievements/screens/achievements_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
+import 'features/game/screens/attack_screen.dart';
+import 'features/game/screens/raid_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -79,6 +81,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/attack',
+        builder: (context, state) => const AttackScreen(),
+      ),
+      GoRoute(
+        path: '/raid',
+        builder: (context, state) => const RaidScreen(),
       ),
     ],
   );
